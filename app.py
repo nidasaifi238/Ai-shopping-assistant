@@ -1,5 +1,6 @@
 import os
 import tempfile
+import time
 
 import streamlit as st
 
@@ -14,20 +15,35 @@ st.title("🛒 AI Shopping Assistant")
 st.caption("Tell me what you want — I'll search, rate, and order the best match for you.")
 
 
-def run_agent(messages):
-    """Invoke the agent and return response text, with error/empty handling
-    so failures are visible in the UI instead of rendering a blank bubble."""
-    try:
-        result = agent.invoke({"messages": messages})
-        last_msg = result["messages"][-1]
-        response = (last_msg.content or "").replace("`", "")
-        if not response.strip():
-            print("DEBUG — empty response. Full last message:", repr(last_msg))
-            response = "⚠️ The agent didn't return any text. Check your terminal for details."
-        return response
-    except Exception as e:
-        print("DEBUG — exception during agent.invoke:", repr(e))
-        return f"⚠️ Error while running the agent: {e}"
+def run_agent(messages, max_retries=2):
+    """Invoke the agent and return response text, with retry/error/empty
+    handling so failures are visible in the UI instead of a blank bubble.
+
+    Retries on malformed tool-call generations (a known intermittent quirk
+    of this model's XML-based tool-calling format) and other transient
+    errors, since a retry often succeeds cleanly."""
+    for attempt in range(max_retries + 1):
+        try:
+            result = agent.invoke({"messages": messages})
+            last_msg = result["messages"][-1]
+            response = (last_msg.content or "").replace("`", "")
+            if response.strip():
+                return response
+            print(
+                f"DEBUG — empty response on attempt {attempt}."
+                if attempt < max_retries
+                else "DEBUG — empty response after retries.",
+                "Full last message:", repr(last_msg),
+            )
+        except Exception as e:
+            print(f"DEBUG — attempt {attempt} failed: {repr(e)}")
+            if attempt == max_retries:
+                return (
+                    "⚠️ The assistant had trouble processing that request. "
+                    "Please try rephrasing it."
+                )
+        time.sleep(1)
+    return "⚠️ The agent didn't return any text after retries. Check your terminal/logs for details."
 
 
 # ---------------------------------------------------------------------------
