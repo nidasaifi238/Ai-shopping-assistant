@@ -4,7 +4,7 @@ import os
 import sqlite3
 from typing import Optional, Union
 
-from dotenv import load_dotenv
+
 from langchain.agents import create_agent
 from langchain.tools import tool
 from langchain_core.messages import HumanMessage
@@ -12,7 +12,11 @@ from langchain_groq import ChatGroq
 
 from reviews_api import get_product_rating
 
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "store.db")
 
